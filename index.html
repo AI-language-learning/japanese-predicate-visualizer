@@ -1,10 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visualizador de Estructura Oracional Japonesa</title>
-    <script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"></script>
     <style>
         * {
             margin: 0;
@@ -235,6 +234,13 @@
             color: #78716c;
         }
         
+        /* Modificador adnominal - 連体修飾 */
+        .adnominal-mod {
+            color: #059669;
+            font-weight: 500;
+            background: rgba(5, 150, 105, 0.1);
+        }
+        
         /* Conjunción - 接続詞 */
         .conjunction {
             color: #0d9488;
@@ -384,6 +390,7 @@
                 <option value="雨が降っているから、傘を持っていったほうがいいよ。">6. 雨が降っているから... (aspecto progresivo, consejo)</option>
                 <option value="日本語は難しくないと思います。">7. 日本語は難しくないと思います。(negación, cita, cortés)</option>
                 <option value="昨日買った本をもう読んでしまった。">8. 昨日買った本をもう読んでしまった。(modificación nominal, completivo)</option>
+                <option value="あの山の中にある白い花を一輪取ってきてくれたなら、私はあなたを離縁したりしないわ。">9. あの山の中にある白い花を... (modificador adnominal, dirección)</option>
             </select>
         </div>
         <div class="button-group">
@@ -428,6 +435,10 @@
                 <span>Complemento（補語）</span>
             </div>
             <div class="legend-item">
+                <div class="legend-color" style="background: rgba(5, 150, 105, 0.2);"></div>
+                <span>Modificador adnominal（連体修飾）</span>
+            </div>
+            <div class="legend-item">
                 <div class="legend-color" style="background: #e5e7eb;"></div>
                 <span>Posposición（後置詞）</span>
             </div>
@@ -469,7 +480,7 @@
                 <tr>
                     <td>Expresión funcional</td>
                     <td>述部機能表現（じゅつぶきのうひょうげん）</td>
-                    <td>Expresiones que añaden voz, modalidad, aspecto, etc.</td>
+                    <td>Expresiones que añaden voz, modalidad, aspecto, dirección, etc.</td>
                 </tr>
                 <tr>
                     <td>Expresión final</td>
@@ -480,6 +491,11 @@
                     <td>Complemento</td>
                     <td>補語（ほご）</td>
                     <td>Elemento nominal que complementa al predicado</td>
+                </tr>
+                <tr>
+                    <td>Modificador adnominal</td>
+                    <td>連体修飾（れんたいしゅうしょく）</td>
+                    <td>Adjetivo o verbo que modifica un nominal</td>
                 </tr>
                 <tr>
                     <td>Posposición</td>
@@ -503,6 +519,7 @@
         <div id="structureView" class="structure-view" style="display: none;"></div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"></script>
     <script>
         let tokenizer = null;
         
@@ -514,12 +531,8 @@
             header.classList.toggle('active');
         }
         
-        // Inicialización - usar diccionario local si está disponible, si no CDN
-        const dicPath = window.location.hostname === 'localhost' || window.location.protocol === 'file:' 
-            ? './dict' 
-            : (document.querySelector('script[src*="dict/"]') ? './dict' : 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict');
-        
-        kuromoji.builder({ dicPath:"./dict" }).build((err, _tokenizer) => {
+        // Inicialización
+        kuromoji.builder({ dicPath: "./dict" }).build((err, _tokenizer) => {
             if (err) {
                 document.getElementById('result').innerHTML = '<span style="color: red;">Error al cargar el diccionario</span>';
                 return;
@@ -558,7 +571,8 @@
         const predicateFunctionalPatterns = {
             voice: ['れる', 'られる', 'せる', 'させる', 'させられる'],
             giving: ['あげる', 'もらう', 'くれる', 'いただく', 'くださる', 'さしあげる'],
-            aspect: ['いる', 'ある', 'おく', 'しまう', 'みる', 'くる', 'いく', 'おる'],
+            aspect: ['いる', 'ある', 'おく', 'しまう', 'みる', 'おる'],
+            direction: ['くる', 'いく', '来る', '行く'],
             modality: ['らしい', 'ようだ', 'そうだ', 'みたいだ', 'はずだ', 'わけだ', 'つもりだ', 'べきだ', 'かもしれない', 'にちがいない', 'だろう', 'でしょう'],
             desire: ['たい', 'たがる', 'ほしい'],
             polite: ['ます', 'です'],
@@ -593,6 +607,8 @@
             'predicate-func-modal': '述部機能表現（推定）\nExp. funcional: Modalidad',
             'predicate-func-polite': '丁寧詞\nHonorífico',
             'predicate-func-volition': '述部機能表現（意志）\nExp. funcional: Volición',
+            'predicate-func-direction': '述部機能表現（方向）\nExp. funcional: Dirección',
+            'predicate-func-formal': '述部機能表現（形式）\nExp. funcional: Formal',
             'perfective': '完了詞\nPerfectivo',
             'continuative': '継続形\nF. continuativa',
             'declarative': '宣言詞\nDeclarativo',
@@ -605,6 +621,7 @@
             'postposition-topic': '後置詞（主題）\nPosp.: Tópico',
             'postposition-conn': '後置詞（接続）\nPosp.: Conexión',
             'adnominal': '連体詞\nAdnominal',
+            'adnominal-mod': '連体修飾\nMod. adnominal',
             'conjunction': '接続詞\nConjunción',
             'verb': '動詞\nVerbo'
         };
@@ -622,6 +639,7 @@
                 const token = tokens[i];
                 const nextToken = tokens[i + 1];
                 const prevToken = tokens[i - 1];
+                const prevPrevToken = tokens[i - 2];
                 
                 const surface = token.surface_form;
                 const pos = token.pos;
@@ -672,8 +690,25 @@
                 }
                 // Verbos
                 else if (pos === '動詞') {
-                    if (pos_detail1 === '非自立') {
-                        if (predicateFunctionalPatterns.aspect.includes(basic_form)) {
+                    // 「〜たりする」の「する」→ 述部機能表現（形式）
+                    if (basic_form === 'する' && prevToken && prevToken.surface_form === 'たり') {
+                        category = 'predicate-func';
+                        labelKey = 'predicate-func-formal';
+                    }
+                    // 補助動詞（非自立）
+                    else if (pos_detail1 === '非自立') {
+                        // 「てくる」「ていく」→ 述部機能表現（方向）
+                        if (predicateFunctionalPatterns.direction.includes(basic_form)) {
+                            if (prevToken && (prevToken.surface_form === 'て' || prevToken.surface_form === 'で')) {
+                                category = 'predicate-func';
+                                labelKey = 'predicate-func-direction';
+                            } else {
+                                category = 'predicate-func';
+                                labelKey = 'predicate-func';
+                            }
+                        }
+                        // アスペクト補助動詞
+                        else if (predicateFunctionalPatterns.aspect.includes(basic_form)) {
                             if (prevToken && (prevToken.surface_form === 'て' || prevToken.surface_form === 'で')) {
                                 category = 'predicate-core';
                                 labelKey = 'verb';
@@ -682,6 +717,7 @@
                                 labelKey = 'predicate-func';
                             }
                         }
+                        // 授受動詞
                         else if (predicateFunctionalPatterns.giving.includes(basic_form)) {
                             category = 'predicate-func';
                             labelKey = 'predicate-func-giving';
@@ -691,6 +727,7 @@
                             labelKey = 'predicate-func';
                         }
                     }
+                    // 自立動詞
                     else {
                         category = 'predicate-core';
                         labelKey = 'predicate-core-verb';
@@ -698,22 +735,32 @@
                 }
                 // Adjetivos
                 else if (pos === '形容詞') {
+                    // 否定「ない」
                     if (basic_form === 'ない' && pos_detail1 === '非自立') {
                         category = 'negative';
                         labelKey = 'negative';
                     }
+                    // 「いい」（非自立）→ 述部機能表現
                     else if (basic_form === 'いい' && pos_detail1 === '非自立') {
                         category = 'predicate-func';
                         labelKey = 'predicate-func';
                     }
+                    // 希望・程度の補助形容詞
                     else if (pos_detail1 === '非自立' && predicateFunctionalPatterns.desire.concat(predicateFunctionalPatterns.degree).includes(basic_form)) {
                         category = 'predicate-func';
                         labelKey = 'predicate-func';
                     }
+                    // 推定「らしい」
                     else if (basic_form === 'らしい' && pos_detail1 === '非自立') {
                         category = 'predicate-func';
                         labelKey = 'predicate-func-modal';
                     }
+                    // 連体修飾（形容詞の後に名詞が来る場合）
+                    else if (nextToken && nextToken.pos === '名詞' && nextToken.pos_detail_1 !== '非自立') {
+                        category = 'adnominal-mod';
+                        labelKey = 'adnominal-mod';
+                    }
+                    // 一般の形容詞（述部の核）
                     else {
                         category = 'predicate-core';
                         labelKey = 'predicate-core-adj';
@@ -886,6 +933,8 @@
                 'predicate-func-modal': 'Modal.',
                 'predicate-func-polite': 'Cortés',
                 'predicate-func-volition': 'Volición',
+                'predicate-func-direction': 'Dirección',
+                'predicate-func-formal': 'Formal',
                 'perfective': 'Perf.',
                 'continuative': 'Cont.',
                 'declarative': 'Decl.',
@@ -898,6 +947,7 @@
                 'postposition-topic': 'Tópico',
                 'postposition-conn': 'Conex.',
                 'adnominal': 'Adnom.',
+                'adnominal-mod': 'Mod.Adn.',
                 'conjunction': 'Conj.',
                 'verb': 'Verbo',
                 'other': ''
