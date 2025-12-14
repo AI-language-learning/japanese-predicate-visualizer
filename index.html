@@ -1,0 +1,915 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Estructura Oracional Japonesa</title>
+    <script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 20px;
+            background-color: #f8fafc;
+            line-height: 1.8;
+        }
+        
+        h1 {
+            color: #1e293b;
+            border-bottom: 3px solid #dc2626;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+        
+        .input-section {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 25px;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 18px;
+            font-family: inherit;
+            resize: vertical;
+            transition: border-color 0.2s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #dc2626;
+        }
+        
+        .button-group {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #b91c1c;
+        }
+        
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        button.secondary {
+            background: #64748b;
+        }
+        
+        button.secondary:hover {
+            background: #475569;
+        }
+        
+        .legend {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 25px;
+        }
+        
+        .legend h3 {
+            color: #1e293b;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        
+        .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 20px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        
+        .legend-color {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+        }
+        
+        .result-section {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .result-section h3 {
+            color: #1e293b;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        
+        .analyzed-text {
+            font-size: 22px;
+            line-height: 2.5;
+            padding: 20px;
+            background: #fafafa;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .word {
+            display: inline-block;
+            position: relative;
+            margin: 2px 1px;
+            padding: 2px 4px;
+            border-radius: 4px;
+            cursor: help;
+        }
+        
+        .word:hover {
+            opacity: 0.8;
+        }
+        
+        /* Núcleo del predicado - 述部の核 */
+        .predicate-core {
+            color: #dc2626;
+            font-weight: 700;
+            background: rgba(220, 38, 38, 0.1);
+            border-bottom: 3px solid #dc2626;
+        }
+        
+        /* Expresión funcional del predicado - 述部機能表現 */
+        .predicate-func {
+            color: #7c3aed;
+            font-weight: 500;
+            background: rgba(124, 58, 237, 0.1);
+            border-bottom: 2px solid #7c3aed;
+        }
+        
+        /* Perfectivo / Forma continuativa - 完了詞・継続形 */
+        .perfective {
+            color: #0891b2;
+            font-weight: 500;
+            background: rgba(8, 145, 178, 0.1);
+            border-bottom: 2px solid #0891b2;
+        }
+        
+        /* Declarativo - 宣言詞 */
+        .declarative {
+            color: #f59e0b;
+            font-weight: 500;
+            background: rgba(245, 158, 11, 0.1);
+            border-bottom: 2px solid #f59e0b;
+        }
+        
+        /* Adjetivo negativo - 否定形容詞 */
+        .negative {
+            color: #be123c;
+            font-weight: 500;
+            background: rgba(190, 18, 60, 0.1);
+            border-bottom: 2px solid #be123c;
+        }
+        
+        /* Expresión final - 文末表現 */
+        .sentence-final {
+            color: #10b981;
+            font-weight: 500;
+            background: rgba(16, 185, 129, 0.1);
+            border-bottom: 2px solid #10b981;
+        }
+        
+        /* Adverbio - 副詞 */
+        .adverb {
+            color: #db2777;
+            font-weight: 500;
+            background: rgba(219, 39, 119, 0.1);
+        }
+        
+        /* Complemento - 補語 */
+        .complement {
+            color: #2563eb;
+            font-weight: 500;
+            background: rgba(37, 99, 235, 0.1);
+        }
+        
+        /* Posposición - 後置詞 */
+        .postposition {
+            color: #6b7280;
+        }
+        
+        /* Adnominal - 連体詞 */
+        .adnominal {
+            color: #78716c;
+        }
+        
+        /* Conjunción - 接続詞 */
+        .conjunction {
+            color: #0d9488;
+            font-weight: 500;
+        }
+        
+        /* Otros - その他 */
+        .other {
+            color: #374151;
+        }
+        
+        .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 100;
+        }
+        
+        .word:hover .tooltip {
+            opacity: 1;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+        
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e2e8f0;
+            border-top-color: #dc2626;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .predicate-block {
+            display: inline;
+            border-bottom: 2px dashed #94a3b8;
+            padding-bottom: 2px;
+        }
+        
+        .structure-view {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        
+        .structure-row {
+            margin: 5px 0;
+        }
+        
+        .sample-sentences {
+            margin-top: 15px;
+        }
+        
+        .sample-sentences select {
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            max-width: 100%;
+        }
+        
+        .term-table {
+            margin-top: 20px;
+            font-size: 13px;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        
+        .term-table th, .term-table td {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            text-align: left;
+        }
+        
+        .term-table th {
+            background: #f1f5f9;
+            font-weight: 600;
+        }
+        
+        .collapsible {
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .collapsible::before {
+            content: '▶ ';
+            font-size: 12px;
+        }
+        
+        .collapsible.active::before {
+            content: '▼ ';
+        }
+        
+        .collapsible-content {
+            display: none;
+            margin-top: 10px;
+        }
+        
+        .collapsible-content.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Visualizador de Estructura Oracional Japonesa</h1>
+    <p class="subtitle">Introduce una oración en japonés para visualizar el núcleo del predicado, las expresiones funcionales, los complementos, los adverbios, etc.</p>
+    
+    <div class="input-section">
+        <textarea id="inputText" placeholder="Introduce una oración en japonés..."></textarea>
+        <div class="sample-sentences">
+            <label>Selecciona un ejemplo: </label>
+            <select id="sampleSelect">
+                <option value="">-- Selecciona --</option>
+                <option value="あの花は、昨日近くの花屋で買ってきて、生けておいたものなんだけど、とても気に入ってる。">1. あの花は、昨日近くの花屋で買ってきて... (continuativo, auxiliares)</option>
+                <option value="彼女に本を昨日渡してあげたよ。">2. 彼女に本を昨日渡してあげたよ。(complementos, dar/recibir)</option>
+                <option value="食べさせられていたらしいよね。">3. 食べさせられていたらしいよね。(causativo+pasivo+aspecto)</option>
+                <option value="この本はとても面白かったので、友達にも勧めたい。">4. この本はとても面白かったので... (adjetivo, deseo)</option>
+                <option value="明日までにレポートを書かなければならない。">5. 明日までにレポートを書かなければならない。(obligación)</option>
+                <option value="雨が降っているから、傘を持っていったほうがいいよ。">6. 雨が降っているから... (aspecto progresivo, consejo)</option>
+                <option value="日本語は難しくないと思います。">7. 日本語は難しくないと思います。(negación, cita, cortés)</option>
+                <option value="昨日買った本をもう読んでしまった。">8. 昨日買った本をもう読んでしまった。(modificación nominal, completivo)</option>
+            </select>
+        </div>
+        <div class="button-group">
+            <button id="analyzeBtn" disabled>Analizar</button>
+            <button id="clearBtn" class="secondary">Borrar</button>
+        </div>
+    </div>
+    
+    <div class="legend">
+        <h3>Leyenda</h3>
+        <div class="legend-items">
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(220, 38, 38, 0.3); border: 2px solid #dc2626;"></div>
+                <span>Núcleo del predicado（述部の核）</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(8, 145, 178, 0.3); border: 2px solid #0891b2;"></div>
+                <span>Perfectivo / Continuativo（完了詞/継続形）</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(245, 158, 11, 0.3); border: 2px solid #f59e0b;"></div>
+                <span>Declarativo（宣言詞）</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(190, 18, 60, 0.3); border: 2px solid #be123c;"></div>
+                <span>Adjetivo negativo（否定形容詞）</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(124, 58, 237, 0.3); border: 2px solid #7c3aed;"></div>
+                <span>Expresión funcional（述部機能表現）</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(16, 185, 129, 0.3); border: 2px solid #10b981;"></div>
+                <span>Expresión final（文末表現）</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(219, 39, 119, 0.2);"></div>
+                <span>Adverbio（副詞）</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: rgba(37, 99, 235, 0.2);"></div>
+                <span>Complemento（補語）</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #e5e7eb;"></div>
+                <span>Posposición（後置詞）</span>
+            </div>
+        </div>
+        
+        <h3 class="collapsible" style="margin-top: 20px;" onclick="toggleTable()">Tabla de términos</h3>
+        <div class="collapsible-content" id="termTable">
+            <table class="term-table">
+                <tr>
+                    <th>Término en español</th>
+                    <th>Término en japonés</th>
+                    <th>Descripción</th>
+                </tr>
+                <tr>
+                    <td>Núcleo del predicado</td>
+                    <td>述部の核（じゅつぶのかく）</td>
+                    <td>Verbo, adjetivo, nominal adjetival o nominal que forma la base del predicado</td>
+                </tr>
+                <tr>
+                    <td>Perfectivo</td>
+                    <td>完了詞（かんりょうし）</td>
+                    <td>た/だ - indica pasado o aspecto perfectivo</td>
+                </tr>
+                <tr>
+                    <td>Forma continuativa</td>
+                    <td>継続形（けいぞくけい）</td>
+                    <td>て/で - forma conjugada del perfectivo para conexión</td>
+                </tr>
+                <tr>
+                    <td>Declarativo</td>
+                    <td>宣言詞（せんげんし）</td>
+                    <td>だ/です - marca predicativa para nominales</td>
+                </tr>
+                <tr>
+                    <td>Adjetivo negativo</td>
+                    <td>否定形容詞（ひていけいようし）</td>
+                    <td>ない - expresa negación</td>
+                </tr>
+                <tr>
+                    <td>Expresión funcional</td>
+                    <td>述部機能表現（じゅつぶきのうひょうげん）</td>
+                    <td>Expresiones que añaden voz, modalidad, aspecto, etc.</td>
+                </tr>
+                <tr>
+                    <td>Expresión final</td>
+                    <td>文末表現（ぶんまつひょうげん）</td>
+                    <td>よ/ね/な/か - partículas finales</td>
+                </tr>
+                <tr>
+                    <td>Complemento</td>
+                    <td>補語（ほご）</td>
+                    <td>Elemento nominal que complementa al predicado</td>
+                </tr>
+                <tr>
+                    <td>Posposición</td>
+                    <td>後置詞（こうちし）</td>
+                    <td>Partículas que siguen a los nominales (が/を/に/で/etc.)</td>
+                </tr>
+                <tr>
+                    <td>Adverbio</td>
+                    <td>副詞（ふくし）</td>
+                    <td>Palabras que modifican al predicado</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    
+    <div class="result-section">
+        <h3>Resultado del análisis</h3>
+        <div id="result" class="analyzed-text">
+            <span class="loading">Cargando diccionario</span>
+        </div>
+        <div id="structureView" class="structure-view" style="display: none;"></div>
+    </div>
+
+    <script>
+        let tokenizer = null;
+        
+        // Alternar tabla de términos
+        function toggleTable() {
+            const content = document.getElementById('termTable');
+            const header = content.previousElementSibling;
+            content.classList.toggle('show');
+            header.classList.toggle('active');
+        }
+        
+        // Inicialización - usar diccionario local si está disponible, si no CDN
+        const dicPath = window.location.hostname === 'localhost' || window.location.protocol === 'file:' 
+            ? './dict' 
+            : (document.querySelector('script[src*="dict/"]') ? './dict' : 'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict');
+        
+        kuromoji.builder({ dicPath:"./dict" }).build((err, _tokenizer) => {
+            if (err) {
+                document.getElementById('result').innerHTML = '<span style="color: red;">Error al cargar el diccionario</span>';
+                return;
+            }
+            tokenizer = _tokenizer;
+            document.getElementById('analyzeBtn').disabled = false;
+            document.getElementById('result').innerHTML = '<span style="color: #64748b;">Introduce un texto y haz clic en "Analizar"</span>';
+        });
+        
+        // Selección de ejemplo
+        document.getElementById('sampleSelect').addEventListener('change', (e) => {
+            if (e.target.value) {
+                document.getElementById('inputText').value = e.target.value;
+            }
+        });
+        
+        // Botón de análisis
+        document.getElementById('analyzeBtn').addEventListener('click', () => {
+            const text = document.getElementById('inputText').value.trim();
+            if (!text) return;
+            analyzeText(text);
+        });
+        
+        // Botón de borrar
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            document.getElementById('inputText').value = '';
+            document.getElementById('sampleSelect').value = '';
+            document.getElementById('result').innerHTML = '<span style="color: #64748b;">Introduce un texto y haz clic en "Analizar"</span>';
+            document.getElementById('structureView').style.display = 'none';
+        });
+        
+        // Partículas finales (終助詞)
+        const sentenceFinalParticles = ['よ', 'ね', 'な', 'か', 'わ', 'さ', 'ぞ', 'ぜ', 'の', 'かな', 'かしら', 'っけ', 'もの', 'もん'];
+        
+        // Patrones de expresiones funcionales del predicado
+        const predicateFunctionalPatterns = {
+            voice: ['れる', 'られる', 'せる', 'させる', 'させられる'],
+            giving: ['あげる', 'もらう', 'くれる', 'いただく', 'くださる', 'さしあげる'],
+            aspect: ['いる', 'ある', 'おく', 'しまう', 'みる', 'くる', 'いく', 'おる'],
+            modality: ['らしい', 'ようだ', 'そうだ', 'みたいだ', 'はずだ', 'わけだ', 'つもりだ', 'べきだ', 'かもしれない', 'にちがいない', 'だろう', 'でしょう'],
+            desire: ['たい', 'たがる', 'ほしい'],
+            polite: ['ます', 'です'],
+            degree: ['やすい', 'にくい', 'がたい', 'すぎる'],
+            obligation: ['なければならない', 'なくてはいけない', 'ないといけない', 'なきゃ', 'なくちゃ']
+        };
+        
+        // Declarativos
+        const declaratives = ['だ', 'です', 'である', 'じゃ', 'な', 'なら', 'なん', 'ん'];
+        
+        // Perfectivos
+        const perfectives = ['た', 'だ', 'て', 'で', 'たら', 'だら'];
+        
+        // Adjetivos negativos
+        const negatives = ['ない', 'ぬ', 'ん', 'なかっ', 'なく', 'なけれ', 'なきゃ', 'なくちゃ', 'ず'];
+        
+        // Posposiciones de complemento
+        const complementParticles = ['が', 'を', 'に', 'へ', 'で', 'と', 'から', 'まで', 'より'];
+        
+        // Marcadores de tópico
+        const topicMarkers = ['は', 'も', 'って', 'なんて', 'こそ', 'さえ', 'すら', 'だって', 'でも'];
+        
+        // Etiquetas (japonés + español)
+        const labels = {
+            'predicate-core-verb': '述部の核（動詞）\nNúcleo: Verbo',
+            'predicate-core-adj': '述部の核（形容詞）\nNúcleo: Adjetivo',
+            'predicate-core-na': '述部の核（形容名詞）\nNúcleo: Nom. adjetival',
+            'predicate-core-noun': '述部の核（名詞）\nNúcleo: Nominal',
+            'predicate-func': '述部機能表現\nExp. funcional',
+            'predicate-func-voice': '述部機能表現（態）\nExp. funcional: Voz',
+            'predicate-func-giving': '述部機能表現（授受）\nExp. funcional: Dar/Recibir',
+            'predicate-func-modal': '述部機能表現（推定）\nExp. funcional: Modalidad',
+            'predicate-func-polite': '丁寧詞\nHonorífico',
+            'predicate-func-volition': '述部機能表現（意志）\nExp. funcional: Volición',
+            'perfective': '完了詞\nPerfectivo',
+            'continuative': '継続形\nF. continuativa',
+            'declarative': '宣言詞\nDeclarativo',
+            'nominalizer': '名詞化詞\nNominalizador',
+            'negative': '否定形容詞\nAdj. negativo',
+            'sentence-final': '文末表現\nExp. final',
+            'adverb': '副詞\nAdverbio',
+            'complement': '補語\nComplemento',
+            'postposition': '後置詞\nPosposición',
+            'postposition-topic': '後置詞（主題）\nPosp.: Tópico',
+            'postposition-conn': '後置詞（接続）\nPosp.: Conexión',
+            'adnominal': '連体詞\nAdnominal',
+            'conjunction': '接続詞\nConjunción',
+            'verb': '動詞\nVerbo'
+        };
+        
+        function analyzeText(text) {
+            const tokens = tokenizer.tokenize(text);
+            const analyzed = analyzeTokens(tokens);
+            displayResult(analyzed);
+        }
+        
+        function analyzeTokens(tokens) {
+            const result = [];
+            
+            for (let i = 0; i < tokens.length; i++) {
+                const token = tokens[i];
+                const nextToken = tokens[i + 1];
+                const prevToken = tokens[i - 1];
+                
+                const surface = token.surface_form;
+                const pos = token.pos;
+                const pos_detail1 = token.pos_detail_1;
+                const pos_detail2 = token.pos_detail_2;
+                const basic_form = token.basic_form;
+                const conjugation = token.conjugated_form;
+                
+                let category = 'other';
+                let labelKey = 'other';
+                
+                // Símbolos y puntuación
+                if (pos === '記号') {
+                    category = 'symbol';
+                    labelKey = 'symbol';
+                }
+                // Nominales
+                else if (pos === '名詞') {
+                    if ((surface === 'の' || surface === 'ん') && pos_detail1 === '非自立') {
+                        category = 'declarative';
+                        labelKey = 'nominalizer';
+                    }
+                    else if (pos_detail1 === '非自立' && ['もの', 'こと', 'ところ', 'とこ', 'わけ', 'はず', 'つもり', 'よう', 'みたい', 'そう', 'ため', 'せい', 'おかげ', 'ほう'].includes(basic_form)) {
+                        category = 'predicate-func';
+                        labelKey = 'predicate-func';
+                    }
+                    else if (pos_detail1 === '副詞可能') {
+                        category = 'adverb';
+                        labelKey = 'adverb';
+                    }
+                    else {
+                        if (nextToken && (complementParticles.includes(nextToken.surface_form) || topicMarkers.includes(nextToken.surface_form))) {
+                            category = 'complement';
+                            labelKey = 'complement';
+                        } else if (prevToken && prevToken.pos === '連体詞') {
+                            category = 'complement';
+                            labelKey = 'complement';
+                        } else {
+                            if (nextToken && (declaratives.includes(nextToken.surface_form) || nextToken.basic_form === 'だ')) {
+                                category = 'predicate-core';
+                                labelKey = 'predicate-core-noun';
+                            } else {
+                                category = 'complement';
+                                labelKey = 'complement';
+                            }
+                        }
+                    }
+                }
+                // Verbos
+                else if (pos === '動詞') {
+                    if (pos_detail1 === '非自立') {
+                        if (predicateFunctionalPatterns.aspect.includes(basic_form)) {
+                            if (prevToken && (prevToken.surface_form === 'て' || prevToken.surface_form === 'で')) {
+                                category = 'predicate-core';
+                                labelKey = 'verb';
+                            } else {
+                                category = 'predicate-func';
+                                labelKey = 'predicate-func';
+                            }
+                        }
+                        else if (predicateFunctionalPatterns.giving.includes(basic_form)) {
+                            category = 'predicate-func';
+                            labelKey = 'predicate-func-giving';
+                        }
+                        else {
+                            category = 'predicate-func';
+                            labelKey = 'predicate-func';
+                        }
+                    }
+                    else {
+                        category = 'predicate-core';
+                        labelKey = 'predicate-core-verb';
+                    }
+                }
+                // Adjetivos
+                else if (pos === '形容詞') {
+                    if (basic_form === 'ない' && pos_detail1 === '非自立') {
+                        category = 'negative';
+                        labelKey = 'negative';
+                    }
+                    else if (basic_form === 'いい' && pos_detail1 === '非自立') {
+                        category = 'predicate-func';
+                        labelKey = 'predicate-func';
+                    }
+                    else if (pos_detail1 === '非自立' && predicateFunctionalPatterns.desire.concat(predicateFunctionalPatterns.degree).includes(basic_form)) {
+                        category = 'predicate-func';
+                        labelKey = 'predicate-func';
+                    }
+                    else if (basic_form === 'らしい' && pos_detail1 === '非自立') {
+                        category = 'predicate-func';
+                        labelKey = 'predicate-func-modal';
+                    }
+                    else {
+                        category = 'predicate-core';
+                        labelKey = 'predicate-core-adj';
+                    }
+                }
+                // Auxiliares
+                else if (pos === '助動詞') {
+                    if (basic_form === 'た' || (basic_form === 'だ' && (surface === 'た' || surface === 'だ' || surface === 'たら' || surface === 'だら'))) {
+                        category = 'perfective';
+                        labelKey = 'perfective';
+                    }
+                    else if (surface === 'て' || surface === 'で') {
+                        category = 'perfective';
+                        labelKey = 'continuative';
+                    }
+                    else if (basic_form === 'だ' || basic_form === 'です') {
+                        category = 'declarative';
+                        labelKey = 'declarative';
+                    }
+                    else if (basic_form === 'ない' || basic_form === 'ぬ' || basic_form === 'ん') {
+                        category = 'negative';
+                        labelKey = 'negative';
+                    }
+                    else if (basic_form === 'ます') {
+                        category = 'predicate-func';
+                        labelKey = 'predicate-func-polite';
+                    }
+                    else if (predicateFunctionalPatterns.voice.includes(basic_form)) {
+                        category = 'predicate-func';
+                        labelKey = 'predicate-func-voice';
+                    }
+                    else if (basic_form === 'う' || basic_form === 'よう') {
+                        category = 'predicate-func';
+                        labelKey = 'predicate-func-volition';
+                    }
+                    else {
+                        category = 'predicate-func';
+                        labelKey = 'predicate-func';
+                    }
+                }
+                // Partículas
+                else if (pos === '助詞') {
+                    if (pos_detail1 === '終助詞') {
+                        category = 'sentence-final';
+                        labelKey = 'sentence-final';
+                    }
+                    else if (pos_detail1 === '副助詞' && isNearSentenceEnd(tokens, i) && sentenceFinalParticles.includes(surface)) {
+                        category = 'sentence-final';
+                        labelKey = 'sentence-final';
+                    }
+                    else if (pos_detail1 === '格助詞') {
+                        category = 'postposition';
+                        labelKey = 'postposition';
+                    }
+                    else if (pos_detail1 === '係助詞') {
+                        category = 'postposition';
+                        labelKey = 'postposition-topic';
+                    }
+                    else if (pos_detail1 === '接続助詞') {
+                        if (surface === 'て' || surface === 'で') {
+                            category = 'perfective';
+                            labelKey = 'continuative';
+                        }
+                        else {
+                            category = 'postposition';
+                            labelKey = 'postposition-conn';
+                        }
+                    }
+                    else {
+                        category = 'postposition';
+                        labelKey = 'postposition';
+                    }
+                }
+                // Adverbios
+                else if (pos === '副詞') {
+                    category = 'adverb';
+                    labelKey = 'adverb';
+                }
+                // Adnominales
+                else if (pos === '連体詞') {
+                    category = 'adnominal';
+                    labelKey = 'adnominal';
+                }
+                // Conjunciones
+                else if (pos === '接続詞') {
+                    category = 'conjunction';
+                    labelKey = 'conjunction';
+                }
+                // Interjecciones
+                else if (pos === '感動詞') {
+                    category = 'other';
+                    labelKey = 'other';
+                }
+                // Prefijos
+                else if (pos === '接頭詞') {
+                    category = 'complement';
+                    labelKey = 'complement';
+                }
+                
+                result.push({
+                    surface: surface,
+                    category: category,
+                    labelKey: labelKey,
+                    label: labels[labelKey] || labelKey,
+                    pos: pos,
+                    pos_detail: pos_detail1,
+                    basic_form: basic_form
+                });
+            }
+            
+            return result;
+        }
+        
+        function isNearSentenceEnd(tokens, index) {
+            for (let i = index + 1; i < tokens.length && i < index + 4; i++) {
+                if (tokens[i].pos === '記号' && ['。', '？', '！', '?', '!'].includes(tokens[i].surface_form)) {
+                    return true;
+                }
+            }
+            return index >= tokens.length - 3;
+        }
+        
+        function displayResult(analyzed) {
+            const resultDiv = document.getElementById('result');
+            const structureDiv = document.getElementById('structureView');
+            
+            let html = '';
+            let structureHtml = '<div class="structure-row"><strong>Análisis estructural:</strong></div>';
+            
+            for (const item of analyzed) {
+                if (item.category === 'symbol') {
+                    html += `<span class="word other">${escapeHtml(item.surface)}</span>`;
+                } else {
+                    html += `<span class="word ${item.category}">
+                        ${escapeHtml(item.surface)}
+                        <span class="tooltip">${item.label}</span>
+                    </span>`;
+                }
+            }
+            
+            // Vista de estructura
+            structureHtml += '<div class="structure-row">';
+            for (const item of analyzed) {
+                if (item.category !== 'symbol') {
+                    const shortLabel = getShortLabel(item.labelKey);
+                    structureHtml += `<span style="display: inline-block; text-align: center; margin: 0 2px;">
+                        <div style="font-size: 16px;">${escapeHtml(item.surface)}</div>
+                        <div style="font-size: 10px; color: #64748b;">${shortLabel}</div>
+                    </span>`;
+                } else {
+                    structureHtml += `<span style="display: inline-block; margin: 0 2px;">${escapeHtml(item.surface)}</span>`;
+                }
+            }
+            structureHtml += '</div>';
+            
+            resultDiv.innerHTML = html;
+            structureDiv.innerHTML = structureHtml;
+            structureDiv.style.display = 'block';
+        }
+        
+        function getShortLabel(labelKey) {
+            const shortLabels = {
+                'predicate-core-verb': 'Núcleo',
+                'predicate-core-adj': 'Núcleo',
+                'predicate-core-na': 'Núcleo',
+                'predicate-core-noun': 'Núcleo',
+                'predicate-func': 'Func.',
+                'predicate-func-voice': 'Voz',
+                'predicate-func-giving': 'Dar/Rec.',
+                'predicate-func-modal': 'Modal.',
+                'predicate-func-polite': 'Cortés',
+                'predicate-func-volition': 'Volición',
+                'perfective': 'Perf.',
+                'continuative': 'Cont.',
+                'declarative': 'Decl.',
+                'nominalizer': 'Nomlz.',
+                'negative': 'Neg.',
+                'sentence-final': 'Final',
+                'adverb': 'Adv.',
+                'complement': 'Compl.',
+                'postposition': 'Posp.',
+                'postposition-topic': 'Tópico',
+                'postposition-conn': 'Conex.',
+                'adnominal': 'Adnom.',
+                'conjunction': 'Conj.',
+                'verb': 'Verbo',
+                'other': ''
+            };
+            return shortLabels[labelKey] || '';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
