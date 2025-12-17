@@ -234,13 +234,6 @@
             color: #78716c;
         }
         
-        /* Modificador adnominal - 連体修飾 */
-        .adnominal-mod {
-            color: #059669;
-            font-weight: 500;
-            background: rgba(5, 150, 105, 0.1);
-        }
-        
         /* Conjunción - 接続詞 */
         .conjunction {
             color: #0d9488;
@@ -250,6 +243,15 @@
         /* Otros - その他 */
         .other {
             color: #374151;
+        }
+        
+        /* Corchetes para delimitar predicados adnominales */
+        .bracket {
+            color: #94a3b8;
+            font-weight: 400;
+            font-size: 24px;
+            vertical-align: middle;
+            margin: 0 1px;
         }
         
         .tooltip {
@@ -390,7 +392,8 @@
                 <option value="雨が降っているから、傘を持っていったほうがいいよ。">6. 雨が降っているから... (aspecto progresivo, consejo)</option>
                 <option value="日本語は難しくないと思います。">7. 日本語は難しくないと思います。(negación, cita, cortés)</option>
                 <option value="昨日買った本をもう読んでしまった。">8. 昨日買った本をもう読んでしまった。(modificación nominal, completivo)</option>
-                <option value="あの山の中にある白い花を一輪取ってきてくれたなら、私はあなたを離縁したりしないわ。">9. あの山の中にある白い花を... (modificador adnominal, dirección)</option>
+                <option value="あの山の中にある白い花を一輪取ってきてくれたなら、私はあなたを離縁したりしないわ。">9. あの山の中にある白い花を... (predicados adnominales)</option>
+                <option value="花びらの先がとても白い花を一輪取ってきてくれ。">10. 花びらの先がとても白い花を... (predicado adnominal extendido)</option>
             </select>
         </div>
         <div class="button-group">
@@ -435,12 +438,12 @@
                 <span>Complemento（補語）</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background: rgba(5, 150, 105, 0.2);"></div>
-                <span>Modificador adnominal（連体修飾）</span>
-            </div>
-            <div class="legend-item">
                 <div class="legend-color" style="background: #e5e7eb;"></div>
                 <span>Posposición（後置詞）</span>
+            </div>
+            <div class="legend-item">
+                <span style="color: #94a3b8; font-size: 18px;">[ ]</span>
+                <span>Predicado adnominal（連体修飾述部）</span>
             </div>
         </div>
         
@@ -493,11 +496,6 @@
                     <td>Elemento nominal que complementa al predicado</td>
                 </tr>
                 <tr>
-                    <td>Modificador adnominal</td>
-                    <td>連体修飾（れんたいしゅうしょく）</td>
-                    <td>Adjetivo o verbo que modifica un nominal</td>
-                </tr>
-                <tr>
                     <td>Posposición</td>
                     <td>後置詞（こうちし）</td>
                     <td>Partículas que siguen a los nominales (が/を/に/で/etc.)</td>
@@ -506,6 +504,11 @@
                     <td>Adverbio</td>
                     <td>副詞（ふくし）</td>
                     <td>Palabras que modifican al predicado</td>
+                </tr>
+                <tr>
+                    <td>Predicado adnominal</td>
+                    <td>連体修飾述部（れんたいしゅうしょくじゅつぶ）</td>
+                    <td>Predicado que modifica un nominal, marcado con [ ]</td>
                 </tr>
             </table>
         </div>
@@ -621,7 +624,6 @@
             'postposition-topic': '後置詞（主題）\nPosp.: Tópico',
             'postposition-conn': '後置詞（接続）\nPosp.: Conexión',
             'adnominal': '連体詞\nAdnominal',
-            'adnominal-mod': '連体修飾\nMod. adnominal',
             'conjunction': '接続詞\nConjunción',
             'verb': '動詞\nVerbo'
         };
@@ -629,7 +631,8 @@
         function analyzeText(text) {
             const tokens = tokenizer.tokenize(text);
             const analyzed = analyzeTokens(tokens);
-            displayResult(analyzed);
+            const withBrackets = addAdnominalBrackets(analyzed, tokens);
+            displayResult(withBrackets);
         }
         
         function analyzeTokens(tokens) {
@@ -755,11 +758,6 @@
                         category = 'predicate-func';
                         labelKey = 'predicate-func-modal';
                     }
-                    // 連体修飾（形容詞の後に名詞が来る場合）
-                    else if (nextToken && nextToken.pos === '名詞' && nextToken.pos_detail_1 !== '非自立') {
-                        category = 'adnominal-mod';
-                        labelKey = 'adnominal-mod';
-                    }
                     // 一般の形容詞（述部の核）
                     else {
                         category = 'predicate-core';
@@ -867,8 +865,95 @@
                     label: labels[labelKey] || labelKey,
                     pos: pos,
                     pos_detail: pos_detail1,
-                    basic_form: basic_form
+                    basic_form: basic_form,
+                    tokenIndex: i
                 });
+            }
+            
+            return result;
+        }
+        
+        // 連体修飾述部に括弧を付ける
+        function addAdnominalBrackets(analyzed, tokens) {
+            const result = [];
+            
+            // 述部の核が出現して、その後に名詞が来るパターンを検出
+            // 述部の範囲を特定するためのフラグ
+            let predicateStart = -1;
+            let inPredicate = false;
+            
+            for (let i = 0; i < analyzed.length; i++) {
+                const item = analyzed[i];
+                const nextItem = analyzed[i + 1];
+                const prevItem = analyzed[i - 1];
+                
+                // 述部の核または述部の構成要素を検出
+                const isPredicateElement = 
+                    item.category === 'predicate-core' ||
+                    item.category === 'predicate-func' ||
+                    item.category === 'perfective' ||
+                    item.category === 'negative' ||
+                    item.category === 'adverb';
+                
+                // 補語 + 後置詞のパターンで述部の始まりを検出
+                const isComplementWithPostposition = 
+                    item.category === 'complement' && 
+                    nextItem && nextItem.category === 'postposition';
+                
+                // 次のトークンが名詞（自立）かどうか
+                const nextIsNoun = nextItem && 
+                    nextItem.category === 'complement' &&
+                    tokens[nextItem.tokenIndex] &&
+                    tokens[nextItem.tokenIndex].pos === '名詞' &&
+                    tokens[nextItem.tokenIndex].pos_detail_1 !== '非自立' &&
+                    tokens[nextItem.tokenIndex].pos_detail_1 !== '副詞可能';
+                
+                // 述部の核で、直後に名詞が来る場合（単純な連体修飾）
+                if ((item.category === 'predicate-core' || item.category === 'negative' || item.category === 'perfective') && nextIsNoun) {
+                    // この述部の開始位置を遡って探す
+                    let startIdx = i;
+                    
+                    // 後ろから遡って述部の始まりを見つける
+                    for (let j = i - 1; j >= 0; j--) {
+                        const prevEl = analyzed[j];
+                        // 補語+後置詞、副詞、述部要素は述部の一部
+                        if (prevEl.category === 'postposition' ||
+                            prevEl.category === 'complement' ||
+                            prevEl.category === 'adverb' ||
+                            prevEl.category === 'predicate-core' ||
+                            prevEl.category === 'predicate-func' ||
+                            prevEl.category === 'perfective' ||
+                            prevEl.category === 'continuative' ||
+                            prevEl.category === 'negative') {
+                            startIdx = j;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // 開始括弧を挿入
+                    result.splice(result.length - (i - startIdx), 0, {
+                        surface: '[',
+                        category: 'bracket',
+                        labelKey: 'bracket',
+                        label: '',
+                        isBracket: true
+                    });
+                    
+                    // 現在の要素を追加
+                    result.push(item);
+                    
+                    // 終了括弧を追加
+                    result.push({
+                        surface: ']',
+                        category: 'bracket',
+                        labelKey: 'bracket',
+                        label: '',
+                        isBracket: true
+                    });
+                } else {
+                    result.push(item);
+                }
             }
             
             return result;
@@ -893,6 +978,8 @@
             for (const item of analyzed) {
                 if (item.category === 'symbol') {
                     html += `<span class="word other">${escapeHtml(item.surface)}</span>`;
+                } else if (item.category === 'bracket') {
+                    html += `<span class="bracket">${escapeHtml(item.surface)}</span>`;
                 } else {
                     html += `<span class="word ${item.category}">
                         ${escapeHtml(item.surface)}
@@ -904,14 +991,16 @@
             // Vista de estructura
             structureHtml += '<div class="structure-row">';
             for (const item of analyzed) {
-                if (item.category !== 'symbol') {
+                if (item.category === 'symbol') {
+                    structureHtml += `<span style="display: inline-block; margin: 0 2px;">${escapeHtml(item.surface)}</span>`;
+                } else if (item.category === 'bracket') {
+                    structureHtml += `<span style="display: inline-block; margin: 0 1px; color: #94a3b8; font-size: 14px;">${escapeHtml(item.surface)}</span>`;
+                } else {
                     const shortLabel = getShortLabel(item.labelKey);
                     structureHtml += `<span style="display: inline-block; text-align: center; margin: 0 2px;">
                         <div style="font-size: 16px;">${escapeHtml(item.surface)}</div>
                         <div style="font-size: 10px; color: #64748b;">${shortLabel}</div>
                     </span>`;
-                } else {
-                    structureHtml += `<span style="display: inline-block; margin: 0 2px;">${escapeHtml(item.surface)}</span>`;
                 }
             }
             structureHtml += '</div>';
@@ -947,9 +1036,9 @@
                 'postposition-topic': 'Tópico',
                 'postposition-conn': 'Conex.',
                 'adnominal': 'Adnom.',
-                'adnominal-mod': 'Mod.Adn.',
                 'conjunction': 'Conj.',
                 'verb': 'Verbo',
+                'bracket': '',
                 'other': ''
             };
             return shortLabels[labelKey] || '';
