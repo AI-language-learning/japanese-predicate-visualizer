@@ -873,90 +873,156 @@
             return result;
         }
         
+        // 述部の核かどうかを判定
+        function isPredicateCore(item) {
+            return item.category === 'predicate-core' || 
+                   item.labelKey === 'verb';
+        }
+        
+        // 述部の一部かどうかを判定（核以外）
+        function isPredicatePart(item) {
+            return item.category === 'predicate-func' ||
+                   item.category === 'perfective' ||
+                   item.category === 'negative' ||
+                   item.category === 'declarative';
+        }
+        
+        // 述部の構成要素かどうか（補語、後置詞、副詞、連体詞を含む）
+        function isPredicateElement(item) {
+            return isPredicateCore(item) ||
+                   isPredicatePart(item) ||
+                   item.category === 'complement' ||
+                   item.category === 'postposition' ||
+                   item.category === 'adverb' ||
+                   item.category === 'adnominal';
+        }
+        
         // 連体修飾述部に括弧を付ける
         function addAdnominalBrackets(analyzed, tokens) {
-            const result = [];
+            // 結果配列と括弧位置を管理
+            const bracketPositions = []; // {start: number, end: number}
             
-            // 述部の核が出現して、その後に名詞が来るパターンを検出
-            // 述部の範囲を特定するためのフラグ
-            let predicateStart = -1;
-            let inPredicate = false;
-            
+            // 被修飾名詞（自立名詞）を見つけ、その前の述部を特定
             for (let i = 0; i < analyzed.length; i++) {
                 const item = analyzed[i];
-                const nextItem = analyzed[i + 1];
-                const prevItem = analyzed[i - 1];
                 
-                // 述部の核または述部の構成要素を検出
-                const isPredicateElement = 
-                    item.category === 'predicate-core' ||
-                    item.category === 'predicate-func' ||
-                    item.category === 'perfective' ||
-                    item.category === 'negative' ||
-                    item.category === 'adverb';
-                
-                // 補語 + 後置詞のパターンで述部の始まりを検出
-                const isComplementWithPostposition = 
-                    item.category === 'complement' && 
-                    nextItem && nextItem.category === 'postposition';
-                
-                // 次のトークンが名詞（自立）かどうか
-                const nextIsNoun = nextItem && 
-                    nextItem.category === 'complement' &&
-                    tokens[nextItem.tokenIndex] &&
-                    tokens[nextItem.tokenIndex].pos === '名詞' &&
-                    tokens[nextItem.tokenIndex].pos_detail_1 !== '非自立' &&
-                    tokens[nextItem.tokenIndex].pos_detail_1 !== '副詞可能';
-                
-                // 述部の核で、直後に名詞が来る場合（単純な連体修飾）
-                if ((item.category === 'predicate-core' || item.category === 'negative' || item.category === 'perfective') && nextIsNoun) {
-                    // この述部の開始位置を遡って探す
-                    let startIdx = i;
+                // 自立名詞を見つける
+                if (item.category === 'complement' && 
+                    tokens[item.tokenIndex] &&
+                    tokens[item.tokenIndex].pos === '名詞' &&
+                    tokens[item.tokenIndex].pos_detail_1 !== '非自立' &&
+                    tokens[item.tokenIndex].pos_detail_1 !== '副詞可能' &&
+                    tokens[item.tokenIndex].pos_detail_1 !== '数') {
                     
-                    // 後ろから遡って述部の始まりを見つける
+                    // この名詞の直前の要素を調べる
+                    const prevItem = analyzed[i - 1];
+                    if (!prevItem) continue;
+                    
+                    // 直前が述部の核または述部要素の場合、連体修飾述部を探す
+                    if (isPredicateCore(prevItem) || isPredicatePart(prevItem)) {
+                        // 名詞から逆方向にスキャンして、連体修飾述部を特定
+                        const predicates = findAdnominalPredicates(analyzed, i - 1);
+                        
+                        for (const pred of predicates) {
+                            bracketPositions.push(pred);
+                        }
+                    }
+                }
+            }
+            
+            // 括弧を挿入（位置がずれないように後ろから挿入）
+            // 重複を排除
+            const uniquePositions = [];
+            for (const pos of bracketPositions) {
+                const exists = uniquePositions.some(p => p.start === pos.start && p.end === pos.end);
+                if (!exists) {
+                    uniquePositions.push(pos);
+                }
+            }
+            
+            // 後ろから挿入
+            uniquePositions.sort((a, b) => b.start - a.start);
+            
+            const result = [...analyzed];
+            for (const pos of uniquePositions) {
+                // 終了括弧を挿入
+                result.splice(pos.end + 1, 0, {
+                    surface: ']',
+                    category: 'bracket',
+                    labelKey: 'bracket',
+                    label: '',
+                    isBracket: true
+                });
+                // 開始括弧を挿入
+                result.splice(pos.start, 0, {
+                    surface: '[',
+                    category: 'bracket',
+                    labelKey: 'bracket',
+                    label: '',
+                    isBracket: true
+                });
+            }
+            
+            return result;
+        }
+        
+        // 連体修飾述部を逆方向にスキャンして特定
+        function findAdnominalPredicates(analyzed, endIndex) {
+            const predicates = [];
+            let currentEnd = endIndex;
+            let i = endIndex;
+            
+            while (i >= 0) {
+                const item = analyzed[i];
+                
+                // 述部の核を見つけた
+                if (isPredicateCore(item)) {
+                    // この核の述部範囲を特定
+                    let start = i;
+                    
+                    // 核の前の述部機能表現をスキップ（逆順なので後ろに続く）
+                    // 既にendIndexから来ているので、核より後ろ（名詞側）は処理済み
+                    
+                    // 核より前を遡る
                     for (let j = i - 1; j >= 0; j--) {
-                        const prevEl = analyzed[j];
-                        // 補語+後置詞、副詞、述部要素は述部の一部
-                        if (prevEl.category === 'postposition' ||
-                            prevEl.category === 'complement' ||
-                            prevEl.category === 'adverb' ||
-                            prevEl.category === 'predicate-core' ||
-                            prevEl.category === 'predicate-func' ||
-                            prevEl.category === 'perfective' ||
-                            prevEl.category === 'continuative' ||
-                            prevEl.category === 'negative') {
-                            startIdx = j;
+                        const prevItem = analyzed[j];
+                        
+                        // 別の述部の核が出てきたら停止
+                        if (isPredicateCore(prevItem)) {
+                            break;
+                        }
+                        
+                        // 述部の構成要素なら含める
+                        if (isPredicateElement(prevItem)) {
+                            start = j;
                         } else {
+                            // 記号などが出てきたら停止
                             break;
                         }
                     }
                     
-                    // 開始括弧を挿入
-                    result.splice(result.length - (i - startIdx), 0, {
-                        surface: '[',
-                        category: 'bracket',
-                        labelKey: 'bracket',
-                        label: '',
-                        isBracket: true
-                    });
+                    predicates.push({ start: start, end: currentEnd });
                     
-                    // 現在の要素を追加
-                    result.push(item);
+                    // 次の述部を探す
+                    currentEnd = start - 1;
+                    i = start - 1;
                     
-                    // 終了括弧を追加
-                    result.push({
-                        surface: ']',
-                        category: 'bracket',
-                        labelKey: 'bracket',
-                        label: '',
-                        isBracket: true
-                    });
+                    // 次の要素がまだ述部関連なら続ける
+                    if (i >= 0 && (isPredicateCore(analyzed[i]) || isPredicatePart(analyzed[i]))) {
+                        continue;
+                    } else {
+                        break;
+                    }
+                } else if (isPredicatePart(item)) {
+                    // 述部機能表現などを遡る
+                    i--;
                 } else {
-                    result.push(item);
+                    // 述部以外が出てきたら終了
+                    break;
                 }
             }
             
-            return result;
+            return predicates;
         }
         
         function isNearSentenceEnd(tokens, index) {
